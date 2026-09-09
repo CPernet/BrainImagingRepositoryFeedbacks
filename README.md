@@ -32,6 +32,9 @@ python -m backend.app --host 127.0.0.1 --port 8000
 
 Then open `http://127.0.0.1:8000/`.
 
+Opening `frontend/index.html` directly lets you view and type into the form,
+but sending feedback requires the server and the URL above.
+
 ## API
 
 ### `POST /api/feedback`

@@ -82,9 +82,19 @@
   const form = container.querySelector("form");
   const button = container.querySelector("button");
   const status = container.querySelector(".feedback-widget-status");
+  const localFileMessage = "To send feedback, run python -m backend.app from the project folder, then open http://127.0.0.1:8000/.";
+
+  if (window.location.protocol === "file:") {
+    status.textContent = localFileMessage;
+  }
 
   form.addEventListener("submit", async function (event) {
     event.preventDefault();
+    if (window.location.protocol === "file:") {
+      status.textContent = localFileMessage;
+      status.classList.add("error");
+      return;
+    }
     status.textContent = "Submitting feedback…";
     status.classList.remove("error");
     button.disabled = true;
