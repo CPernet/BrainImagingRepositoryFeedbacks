@@ -15,7 +15,8 @@ payload, and summarizing the collected feedback by topic.
   - accepts feedback over HTTP,
   - stores every submission as JSON,
   - writes a companion GitHub issue payload JSON file,
-  - refreshes topic summaries after each submission.
+  - refreshes topic summaries after each submission,
+  - extracts semantic phrases and lexical frequency from collected messages.
 
 The implementation is dependency-free so it can run immediately. It is designed
 so the generated issue JSON can later be handed to automation such as
@@ -56,7 +57,10 @@ Each request creates:
 
 ### `GET /api/summary`
 
-Returns the latest topic aggregation.
+Returns the latest topic aggregation plus lightweight text analysis:
+
+- `analysis.semantic_phrases`: common multi-word concepts extracted from feedback text
+- `analysis.lexical_frequency`: the most frequent content words across submissions
 
 ## Tests
 

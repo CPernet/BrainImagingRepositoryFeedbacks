@@ -34,6 +34,8 @@ class FeedbackServiceTests(unittest.TestCase):
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
             self.assertEqual(summary["total_feedback"], 1)
             self.assertEqual(summary["topics"][0]["name"], "bug")
+            self.assertEqual(summary["analysis"]["lexical_frequency"][0]["term"], "download")
+            self.assertEqual(summary["analysis"]["semantic_phrases"][0]["phrase"], "download button")
 
     def test_infer_topic_falls_back_to_message_keywords(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -48,6 +50,36 @@ class FeedbackServiceTests(unittest.TestCase):
 
             self.assertEqual(response["feedback"]["topic"], "documentation")
             self.assertEqual(response["summary"]["topics"][0]["name"], "documentation")
+            self.assertIn(
+                {"term": "documentation", "count": 1},
+                response["summary"]["analysis"]["lexical_frequency"],
+            )
+
+    def test_summary_analysis_prioritizes_semantics_and_lexical_frequency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            service = FeedbackService(tmp_dir)
+
+            summary = service.submit_feedback(
+                {
+                    "message": (
+                        "Phonology analysis is not useful, it's more about extracting "
+                        "semantics -- lexical freq is useful though."
+                    ),
+                }
+            )["summary"]
+
+            self.assertIn(
+                {"term": "semantics", "count": 1},
+                summary["analysis"]["lexical_frequency"],
+            )
+            self.assertIn(
+                {"term": "lexical", "count": 1},
+                summary["analysis"]["lexical_frequency"],
+            )
+            self.assertIn(
+                {"phrase": "extracting semantics", "count": 1},
+                summary["analysis"]["semantic_phrases"],
+            )
 
     def test_invalid_source_url_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

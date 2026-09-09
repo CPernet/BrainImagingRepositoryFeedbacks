@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import uuid
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
@@ -19,6 +20,44 @@ TOPIC_KEYWORDS = {
     "data access": ("download", "access", "dataset", "dicom", "bids", "file"),
     "usability": ("ui", "ux", "widget", "form", "submit", "interface"),
     "feature request": ("feature", "enhancement", "request", "would like", "please add"),
+}
+
+STOPWORDS = {
+    "a",
+    "about",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "how",
+    "i",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "it's",
+    "more",
+    "not",
+    "of",
+    "on",
+    "or",
+    "so",
+    "that",
+    "the",
+    "this",
+    "though",
+    "to",
+    "useful",
+    "was",
+    "we",
+    "with",
 }
 
 
@@ -99,6 +138,8 @@ class FeedbackService:
     def refresh_summary(self) -> dict[str, Any]:
         topic_counter: Counter[str] = Counter()
         examples: dict[str, list[str]] = defaultdict(list)
+        lexical_counter: Counter[str] = Counter()
+        semantic_phrase_counter: Counter[str] = Counter()
 
         for feedback_file in sorted(self.feedback_dir.glob("*.json")):
             item = json.loads(feedback_file.read_text(encoding="utf-8"))
@@ -107,8 +148,13 @@ class FeedbackService:
                 str(item.get("message", "")),
             )
             topic_counter[topic] += 1
-            if len(examples[topic]) < 3 and item.get("message"):
-                examples[topic].append(str(item["message"]).strip())
+            message = str(item.get("message", "")).strip()
+            if not message:
+                continue
+            if len(examples[topic]) < 3:
+                examples[topic].append(message)
+            lexical_counter.update(self._extract_tokens(message))
+            semantic_phrase_counter.update(self._extract_semantic_phrases(message))
 
         summary = {
             "generated_at": self._timestamp(),
@@ -121,6 +167,16 @@ class FeedbackService:
                 }
                 for topic, count in topic_counter.most_common()
             ],
+            "analysis": {
+                "semantic_phrases": [
+                    {"phrase": phrase, "count": count}
+                    for phrase, count in semantic_phrase_counter.most_common(10)
+                ],
+                "lexical_frequency": [
+                    {"term": term, "count": count}
+                    for term, count in lexical_counter.most_common(10)
+                ],
+            },
         }
         self._write_json(self.summary_path, summary)
         return summary
@@ -155,6 +211,20 @@ class FeedbackService:
     def _write_json(self, destination: Path, content: dict[str, Any]) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(content, indent=2), encoding="utf-8")
+
+    @classmethod
+    def _extract_tokens(cls, text: str) -> list[str]:
+        tokens = re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)?", text.lower())
+        return [
+            token
+            for token in tokens
+            if len(token) > 2 and token not in STOPWORDS and not token.isdigit()
+        ]
+
+    @classmethod
+    def _extract_semantic_phrases(cls, text: str) -> list[str]:
+        tokens = cls._extract_tokens(text)
+        return [" ".join(pair) for pair in zip(tokens, tokens[1:]) if pair[0] != pair[1]]
 
     @staticmethod
     def _timestamp() -> str:
